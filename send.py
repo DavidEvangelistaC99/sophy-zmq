@@ -23,7 +23,7 @@ args = parser.parse_args()
 # CONFIGURACION
 # ==========================================================
 
-RAWDATA = Path("/home/david/Documents/DATA/CHIRP_DP@2025-12-11T15-20-07/rawdata")
+RAWDATA = Path("/home/idi/Documents/DATA/CHIRP_DP@2025-12-11T15-20-07/rawdata")
 
 channels = ["ch0", "ch1"]
 
