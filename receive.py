@@ -4,7 +4,7 @@ import zmq
 from pathlib import Path
 import digital_rf
 
-DEST = Path("/home/idi/Documents/RECEIVED_DATA/CHIRP_DP@2025-12-11T15-20-07")
+DEST = Path("/home/david/Documents/DATA_R/CHIRP_DP@2025-12-11T15-20-07/rawdata")
 
 context = zmq.Context()
 socket = context.socket(zmq.PULL)
