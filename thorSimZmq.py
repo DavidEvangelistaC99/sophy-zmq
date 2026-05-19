@@ -10,13 +10,15 @@ from gnuradio import analog
 
 import digital_rf
 from gr_digital_rf import digital_rf_channel_sink
+from gnuradio import zeromq
 
+import zmq
 
 # ============================================================
 # CONFIG
 # ============================================================
 
-DATA_DIR = "SIN@2026-01-21T00-00-00"
+DATA_DIR = "SIN@2026-01-21T00-00-01"
 CHANNEL_NAME = "ch0"
 
 SAMPLE_RATE = 10_000_000
@@ -37,7 +39,7 @@ class ThorSimulator(gr.top_block):
 
     def __init__(self):
 
-        gr.top_block.__init__(self, "THOR Simulator")
+        gr.top_block.__init__(self, "THOR + ZMQ Simulator")
 
         # -----------------------------
         # SIGNAL SOURCE
@@ -90,14 +92,16 @@ class ThorSimulator(gr.top_block):
 
         run_folder = "rawdata"
 
+
         channel_dir = os.path.join(DATA_DIR, run_folder, CHANNEL_NAME)
+
         os.makedirs(channel_dir, exist_ok=True)
 
         # ========================================================
         # DIGITAL RF SINK (DISK)
         # ========================================================
 
-        self.dst = digital_rf_channel_sink(
+        self.drf = digital_rf_channel_sink(
 
             channel_dir=channel_dir,
 
@@ -131,7 +135,39 @@ class ThorSimulator(gr.top_block):
             debug=True,
         )
 
-        self.connect(self.src, self.dst)
+        # ========================================================
+        # ZMQ SINK (STREAMING)
+        # ========================================================
+
+        self.zmq = zeromq.pub_sink(
+            itemsize=gr.sizeof_gr_complex,
+            vlen=1,
+            address="tcp://*:5555",
+            timeout=100,
+            pass_tags=False,
+            hwm=1000,
+        )
+
+        # ========================================================
+        # CONNECTION (FANOUT)
+        # ========================================================
+
+        self.connect(self.src, self.drf)
+        self.connect(self.src, self.zmq)
+
+        # ========================================================
+        # ZMQ METADATA (SEND ONCE)
+        # ========================================================
+
+        self.context = zmq.Context()
+        self.meta_socket = self.context.socket(zmq.PUB)
+        self.meta_socket.bind("tcp://*:5556")
+
+        # IMPORTANT: allow subscribers to connect
+        time.sleep(2)
+
+        self.meta_socket.send_json(metadata)
+        print("[META] Metadata enviada una sola vez")
 
 
 # ============================================================
@@ -145,7 +181,7 @@ if __name__ == "__main__":
     fg = ThorSimulator()
 
     print("\n====================================")
-    print("THOR SIMULATOR (SCHAIN-COMPATIBLE)")
+    print("THOR SIMULATOR (DRF + ZMQ)")
     print("====================================")
     print(f"Sample Rate : {SAMPLE_RATE}")
     print(f"Center Freq : {CENTER_FREQ}")
@@ -160,4 +196,7 @@ if __name__ == "__main__":
         print("\nStopping flowgraph...")
         fg.stop()
         fg.wait()
+
+        fg.meta_socket.close()
+        fg.context.term()
         print("Done.")
