@@ -12,6 +12,7 @@ import digital_rf
 from gr_digital_rf import digital_rf_channel_sink
 from gnuradio import zeromq
 
+import threading
 import zmq
 
 # ============================================================
@@ -37,6 +38,19 @@ RUN_TIME_SECONDS = 60
 
 class ThorSimulator(gr.top_block):
 
+    def metadata_loop(self):
+
+        while self.running:
+
+            try:
+                meta = dict(self.metadata)
+                meta["heartbeat"] = time.time()
+                self.meta_socket.send_json(meta)
+                time.sleep(1)
+
+            except zmq.ZMQError:
+                break
+
     def __init__(self):
 
         gr.top_block.__init__(self, "THOR + ZMQ Simulator")
@@ -51,6 +65,8 @@ class ThorSimulator(gr.top_block):
             AMPLITUDE,
             0,
         )
+
+        self.running = True
 
         sr_frac = Fraction(SAMPLE_RATE)
 
@@ -145,7 +161,7 @@ class ThorSimulator(gr.top_block):
             address="tcp://*:5555",
             timeout=100,
             pass_tags=False,
-            hwm=1000,
+            hwm=10,
         )
 
         # ========================================================
@@ -164,10 +180,19 @@ class ThorSimulator(gr.top_block):
         self.meta_socket.bind("tcp://*:5556")
 
         # IMPORTANT: allow subscribers to connect
-        time.sleep(2)
+        # time.sleep(2)
 
-        self.meta_socket.send_json(metadata)
-        print("[META] Metadata enviada una sola vez")
+        # self.meta_socket.send_json(metadata)
+        # print("[META] Metadata enviada una sola vez")
+
+        self.metadata = metadata
+        self.meta_thread = threading.Thread(
+            target=self.metadata_loop,
+            daemon=True
+        )
+
+        self.meta_thread.start()
+        print("[META] Metadata loop started")
 
 
 # ============================================================
@@ -194,9 +219,9 @@ if __name__ == "__main__":
 
     finally:
         print("\nStopping flowgraph...")
+        fg.running = False
         fg.stop()
         fg.wait()
-
         fg.meta_socket.close()
         fg.context.term()
         print("Done.")

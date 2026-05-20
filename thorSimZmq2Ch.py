@@ -45,24 +45,16 @@ GLOBAL_START_SAMPLE = GLOBAL_START_TIME * SAMPLE_RATE
 CHANNELS = {
 
     "ch0": {
-
         "tone": 100_000,
-
         "amplitude": 0.7,
-
         "center_freq": CENTER_FREQ_CH0,
-
         "iq_port": 5555,
     },
 
     "ch1": {
-
         "tone": 200_000,
-
         "amplitude": 0.7,
-
         "center_freq": CENTER_FREQ_CH1,
-
         "iq_port": 5557,
     }
 }
@@ -75,7 +67,9 @@ CHANNELS = {
 class ThorSimulator(gr.top_block):
 
     def __init__(self):
+        
 
+        # GNU Radio flowgraph generation
         gr.top_block.__init__(self, "THOR MULTICHANNEL")
 
         sr_frac = Fraction(SAMPLE_RATE)
@@ -129,9 +123,7 @@ class ThorSimulator(gr.top_block):
 
             PULSE_PERCENT = 0.10
 
-            PULSE_SAMPLES = int(
-                IPP_SAMPLES * PULSE_PERCENT
-            )
+            PULSE_SAMPLES = int(IPP_SAMPLES * PULSE_PERCENT)
 
             # ------------------------------------------------
             # GENERATE ONE IPP
