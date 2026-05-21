@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import zmq
+import json
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,95 +9,130 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-IQ_ADDRESS = "tcp://localhost:5555"
-SAMPLE_TYPE = np.complex64
+META_ADDR = "tcp://localhost:5556"
 
-FFT_SIZE = 4096
-PLOT_DECIMATION = 1
-
+IQ_ADDR = "tcp://localhost:5555"
 
 # ============================================================
-# SETUP PLOTS
+# ZMQ CONTEXT
+# ============================================================
+
+ctx = zmq.Context()
+
+# ============================================================
+# METADATA SUBSCRIBER
+# ============================================================
+
+meta_sock = ctx.socket(zmq.SUB)
+
+meta_sock.connect(META_ADDR)
+
+meta_sock.setsockopt_string(
+    zmq.SUBSCRIBE,
+    ""
+)
+
+# ============================================================
+# IQ SUBSCRIBER
+# ============================================================
+
+iq_sock = ctx.socket(zmq.SUB)
+
+iq_sock.connect(IQ_ADDR)
+
+iq_sock.setsockopt(
+    zmq.SUBSCRIBE,
+    b""
+)
+
+# ============================================================
+# POLLER
+# ============================================================
+
+poller = zmq.Poller()
+
+poller.register(meta_sock, zmq.POLLIN)
+poller.register(iq_sock, zmq.POLLIN)
+
+# ============================================================
+# MATPLOTLIB
 # ============================================================
 
 plt.ion()
 
-fig, (ax_time, ax_fft) = plt.subplots(2, 1, figsize=(10, 6))
+fig, ax = plt.subplots()
 
-# time domain
-line_time, = ax_time.plot([], [])
-ax_time.set_title("IQ Time Domain")
-ax_time.set_ylim(-1, 1)
-ax_time.set_xlim(0, 1024)
+line, = ax.plot(np.zeros(1024))
 
-# freq domain
-line_fft, = ax_fft.plot([], [])
-ax_fft.set_title("FFT Spectrum")
-ax_fft.set_xlim(-0.5, 0.5)
+ax.set_ylim(-100, 100)
 
+ax.set_title("FFT")
+
+ax.set_xlabel("Bin")
+
+ax.set_ylabel("Power (dB)")
 
 # ============================================================
-# MAIN
+# MAIN LOOP
 # ============================================================
 
-def main():
+print("\nWaiting data...\n")
 
-    context = zmq.Context()
-    socket = context.socket(zmq.SUB)
-    socket.connect(IQ_ADDRESS)
-    socket.setsockopt_string(zmq.SUBSCRIBE, "")
+while True:
 
-    print("\n====================================")
-    print("THOR RX - LIVE PLOT (TIME + FFT)")
-    print("====================================")
+    events = dict(poller.poll())
 
-    try:
-        while True:
+    # ========================================================
+    # METADATA
+    # ========================================================
 
-            msg = socket.recv()
-            iq = np.frombuffer(msg, dtype=SAMPLE_TYPE)
+    if meta_sock in events:
 
-            # ====================================================
-            # TIME DOMAIN PLOT
-            # ====================================================
-            iq_plot = iq[::PLOT_DECIMATION]
-            line_time.set_data(np.arange(len(iq_plot)), np.real(iq_plot))
+        topic, payload = meta_sock.recv_multipart()
 
-            ax_time.set_xlim(0, len(iq_plot))
+        metadata = json.loads(payload.decode())
 
-            # ====================================================
-            # FFT
-            # ====================================================
-            if len(iq) >= FFT_SIZE:
+        print("\n================================")
+        print("METADATA RECEIVED")
+        print("================================")
 
-                block = iq[:FFT_SIZE]
+        print("Topic:", topic.decode())
 
-                spectrum = np.fft.fftshift(np.fft.fft(block))
-                power = 20 * np.log10(np.abs(spectrum) + 1e-12)
+        print(json.dumps(
+            metadata,
+            indent=4
+        ))
 
-                freq = np.fft.fftshift(np.fft.fftfreq(FFT_SIZE, d=1/1e6))
+    # ========================================================
+    # IQ DATA
+    # ========================================================
 
-                line_fft.set_data(freq, power)
+    if iq_sock in events:
 
-                ax_fft.set_xlim(freq[0], freq[-1])
-                ax_fft.set_ylim(np.min(power), np.max(power))
+        raw = iq_sock.recv()
 
-            # ====================================================
-            # UPDATE PLOTS
-            # ====================================================
-            plt.pause(0.001)
+        iq = np.frombuffer(
+            raw,
+            dtype=np.complex64
+        )
 
-    except KeyboardInterrupt:
-        print("\nStopping plot receiver...")
+        if len(iq) == 0:
+            continue
 
-    finally:
-        socket.close()
-        context.term()
+        # ====================================================
+        # FFT
+        # ====================================================
 
+        fft = np.fft.fftshift(
+            np.fft.fft(iq[:1024])
+        )
 
-# ============================================================
-# RUN
-# ============================================================
+        power = 20 * np.log10(
+            np.abs(fft) + 1e-12
+        )
 
-if __name__ == "__main__":
-    main()
+        line.set_ydata(power)
+
+        fig.canvas.draw()
+
+        fig.canvas.flush_events()

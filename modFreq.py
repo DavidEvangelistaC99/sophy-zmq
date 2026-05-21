@@ -233,7 +233,7 @@ if __name__ == "__main__":
   # chirpModUnion_2(ipp, sr_tx, sr_rx, A_1, A_2, dc_1, dc_2, fc_1, fc_2, bw_1, bw_2, t_d_, window_1, window_2, rep_1, rep_2)
   # full_chirp_2 = chirpModUnion_2(ipp, sr_rx, sr_rx, A, A/2.0, dc, 1.0, fc, fc, bw, bw, td_, window_, 'R', rep_, rep_)
   
-  t = [i for i in range(len(chirp))] 
-  plt.plot(t, np.real(chirp)) 
-  plt.plot(t, np.imag(chirp)) 
+  t = [i for i in range(len(full_chirp))] 
+  plt.plot(t, np.real(full_chirp)) 
+  plt.plot(t, np.imag(full_chirp)) 
   plt.show()
