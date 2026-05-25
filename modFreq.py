@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import signal
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 """
@@ -234,6 +234,6 @@ if __name__ == "__main__":
   # full_chirp_2 = chirpModUnion_2(ipp, sr_rx, sr_rx, A, A/2.0, dc, 1.0, fc, fc, bw, bw, td_, window_, 'R', rep_, rep_)
   
   t = [i for i in range(len(full_chirp))] 
-  plt.plot(t, np.real(full_chirp)) 
-  plt.plot(t, np.imag(full_chirp)) 
-  plt.show()
+  # plt.plot(t, np.real(full_chirp)) 
+  # plt.plot(t, np.imag(full_chirp)) 
+  # plt.show()

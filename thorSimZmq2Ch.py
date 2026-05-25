@@ -20,7 +20,7 @@ import threading
 # CONFIG
 # ============================================================
 
-DATA_DIR = "SIN@2026-01-21T00-00-01"
+DATA_DIR = "/home/david/Documents/DATA/SIN@2026-01-21T00-00-01"
 
 SAMPLE_RATE = 2_500_000
 
