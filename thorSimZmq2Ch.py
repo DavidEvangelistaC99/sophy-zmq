@@ -16,11 +16,13 @@ from gr_digital_rf import digital_rf_channel_sink
 import modFreq
 import threading
 
+import matplotlib.pyplot as plt
+
 # ============================================================
 # CONFIG
 # ============================================================
 
-DATA_DIR = "/home/idi/Documents/DATA/SIN@2026-01-21T00-00-01"
+DATA_DIR = "/home/idi/Documents/DATA/SIN@2026-01-21T00-00-0"
 
 SAMPLE_RATE = 2_500_000
 
@@ -141,12 +143,12 @@ class ThorSimulator(gr.top_block):
 
             A = 1000.0 # 5000.0
             ipp = 400.0e-6
-            dc = 100.0 # 12.0
+            dc = 12.0 # 12.0
             sr_tx = 20.0e6
             sr_rx = 2.5e6
             # The central frequency will define the Chirp sweep (ascending or descending)
-            fc = 1.0e6 # 0.0e6
-            bw = 0.0e6 # 1.0e6
+            fc = 0.0e6 # 0.0e6
+            bw = 1.0e6 # 1.0e6
             td_ = 5.2
             window_ = 'R' # 'B'
             mode_f_ = 0
@@ -174,7 +176,7 @@ class ThorSimulator(gr.top_block):
             # NOISE POWER
             # =================================================
 
-            noise_power = 1.0
+            noise_power = 0.0
 
             # =================================================
             # COMPLEX GAUSSIAN NOISE
@@ -199,6 +201,12 @@ class ThorSimulator(gr.top_block):
             # =================================================
 
             full_chirp_noisy = full_chirp + noise
+
+            plot_iq_signal( full_chirp_noisy,
+                            SAMPLE_RATE,
+                            title=ch_name
+                            )
+
             # ------------------------------------------------
             # GNU RADIO VECTOR SOURCE
             # ------------------------------------------------
@@ -407,6 +415,82 @@ class ThorSimulator(gr.top_block):
         # ============================================================
         # MAIN
         # ============================================================
+
+def plot_iq_signal(iq_data, sample_rate, title="IQ Signal"):
+
+    # ==========================================
+    # TAKE SMALL WINDOW
+    # ==========================================
+
+    N = min(5000, len(iq_data))
+    # N = 5000
+
+    iq = iq_data[:N]
+
+    t = np.arange(N) / sample_rate
+
+    # ==========================================
+    # TIME DOMAIN
+    # ==========================================
+
+    plt.figure(figsize=(12,8))
+
+    plt.subplot(3,1,1)
+
+    plt.plot(t, np.real(iq), label="I")
+    plt.plot(t, np.imag(iq), label="Q")
+
+    plt.title(f"{title} - Time Domain")
+
+    plt.xlabel("Time [s]")
+    plt.ylabel("Amplitude")
+
+    plt.legend()
+
+    # ==========================================
+    # CONSTELLATION
+    # ==========================================
+
+    plt.subplot(3,1,2)
+
+    plt.scatter(
+        np.real(iq),
+        np.imag(iq),
+        s=1
+    )
+
+    plt.title("IQ Constellation")
+
+    plt.xlabel("I")
+    plt.ylabel("Q")
+
+    plt.axis("equal")
+
+    # ==========================================
+    # FFT
+    # ==========================================
+
+    plt.subplot(3,1,3)
+
+    fft_data = np.fft.fftshift(np.fft.fft(iq))
+
+    freqs = np.fft.fftshift(
+        np.fft.fftfreq(len(iq), d=1/sample_rate)
+    )
+
+    power = 20*np.log10(np.abs(fft_data) + 1e-12)
+
+    plt.plot(freqs/1e6, power)
+
+    plt.title("Spectrum")
+
+    plt.xlabel("Frequency [MHz]")
+    plt.ylabel("Power [dB]")
+
+    plt.tight_layout()
+
+    plt.show()
+
 
 if __name__ == "__main__":
 
