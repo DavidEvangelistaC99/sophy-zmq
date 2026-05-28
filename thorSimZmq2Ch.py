@@ -53,6 +53,17 @@ CHANNELS = {
         "amplitude": 1.0,
         "center_freq": CENTER_FREQ_CH0,
         "iq_port": 5555,
+    }
+}
+
+'''
+CHANNELS = {
+
+    "ch0": {
+        "tone": 100_000,
+        "amplitude": 1.0,
+        "center_freq": CENTER_FREQ_CH0,
+        "iq_port": 5555,
     },
 
     "ch1": {
@@ -62,6 +73,7 @@ CHANNELS = {
         "iq_port": 5557,
     }
 }
+'''
 
 
 # ============================================================
@@ -127,16 +139,16 @@ class ThorSimulator(gr.top_block):
             # PULSED SIGNAL PARAMETERS
             # ------------------------------------------------
 
-            A = 5000.0
+            A = 1000.0 # 5000.0
             ipp = 400.0e-6
-            dc = 12.0
+            dc = 100.0 # 12.0
             sr_tx = 20.0e6
             sr_rx = 2.5e6
             # The central frequency will define the Chirp sweep (ascending or descending)
-            fc = 0.0e6
-            bw = 1.0e6
+            fc = 1.0e6 # 0.0e6
+            bw = 0.0e6 # 1.0e6
             td_ = 5.2
-            window_ = 'B'
+            window_ = 'R' # 'B'
             mode_f_ = 0
             phi_ = 0
             rep_ = 250.0
@@ -148,7 +160,7 @@ class ThorSimulator(gr.top_block):
             _, full_chirp = modFreq.chirpMod(A, 
                                             ipp, 
                                             dc, 
-                                            sr_tx, 
+                                            sr_rx, 
                                             sr_rx, 
                                             fc, 
                                             bw, 
@@ -193,6 +205,7 @@ class ThorSimulator(gr.top_block):
 
             src = blocks.vector_source_c(
                 full_chirp_noisy.tolist(),
+                # full_chirp.tolist(),
                 repeat=True
             )
 
@@ -419,11 +432,40 @@ if __name__ == "__main__":
         print(f"  Tone       : {cfg['tone']}")
         print(f"  CenterFreq : {cfg['center_freq']}")
         print(f"  IQ ZMQ     : tcp://localhost:{cfg['iq_port']}")
-
+    
+    '''
     print("\nMetadata ZMQ : tcp://localhost:5556")
     print("\nStarting flowgraph...\n")
 
     fg.start()
+    '''
+
+    
+    # ============================================================
+    # CONTROL SOCKET
+    # ============================================================
+
+    CTRL_ADDR = "tcp://*:6000"
+
+    ctrl_socket = fg.context.socket(zmq.REP)
+
+    ctrl_socket.bind(CTRL_ADDR)
+
+    print(f"\n[CTRL] Waiting RX READY on {CTRL_ADDR} ...")
+
+    msg = ctrl_socket.recv()
+
+    print(f"[CTRL] RX says: {msg.decode()}")
+
+    ctrl_socket.send(b"START")
+
+    # Give ZMQ time to propagate subscriptions
+    time.sleep(1)
+
+    print("\n[CTRL] Starting synchronized flowgraph...\n")
+
+    fg.start()
+    
 
     try:
 
