@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-DATA_DIR = "/home/idi/Documents/DATA/SIN@2026-01-21T00-00-0"
+DATA_DIR = "/home/david/Documents/DATA/SIN@2026-01-21T00-00-01"
 
 SAMPLE_RATE = 2_500_000
 
@@ -33,8 +33,8 @@ UUID_STR = "thor-simulator"
 
 RUN_TIME_SECONDS = 60
 
-ENABLE_ZMQ = True
-ENABLE_DIGITAL_RF = False
+ENABLE_ZMQ = 1
+ENABLE_DIGITAL_RF = 0
 
 # ============================================================
 # GLOBAL SYNCHRONIZED TIMEBASE
@@ -76,7 +76,6 @@ CHANNELS = {
     }
 }
 '''
-
 
 # ============================================================
 # FLOWGRAPH
@@ -137,11 +136,11 @@ class ThorSimulator(gr.top_block):
 
             print(f"\n[INIT] Creating {ch_name}")
 
-            # ------------------------------------------------
+            # ================================================
             # PULSED SIGNAL PARAMETERS
-            # ------------------------------------------------
+            # ================================================
 
-            A = 1000.0 # 5000.0
+            A = 5000.0 # 5000.0
             ipp = 400.0e-6
             dc = 12.0 # 12.0
             sr_tx = 20.0e6
@@ -155,9 +154,9 @@ class ThorSimulator(gr.top_block):
             phi_ = 0
             rep_ = 250.0
 
-            # ------------------------------------------------
+            # ================================================
             # GENERATE ONE IPP
-            # ------------------------------------------------
+            # ================================================
 
             _, full_chirp = modFreq.chirpMod(A, 
                                             ipp, 
@@ -202,14 +201,22 @@ class ThorSimulator(gr.top_block):
 
             full_chirp_noisy = full_chirp + noise
 
+            print("len(full_chirp) =", len(full_chirp))
+
+            pulse = np.abs(full_chirp)
+
+            peak = np.argmax(pulse)
+
+            print("peak =", peak)
+
             plot_iq_signal( full_chirp_noisy,
                             SAMPLE_RATE,
                             title=ch_name
                             )
 
-            # ------------------------------------------------
+            # ================================================
             # GNU RADIO VECTOR SOURCE
-            # ------------------------------------------------
+            # ================================================
 
             src = blocks.vector_source_c(
                 full_chirp_noisy.tolist(),
@@ -217,9 +224,9 @@ class ThorSimulator(gr.top_block):
                 repeat=True
             )
 
-            # ------------------------------------------------
+            # ================================================
             # METADATA
-            # ------------------------------------------------
+            # ================================================
 
             metadata = {
 
@@ -308,9 +315,9 @@ class ThorSimulator(gr.top_block):
                 }
             }
 
-            # ------------------------------------------------
+            # -================================================
             # CHANNEL DIRECTORY
-            # ------------------------------------------------
+            # ================================================
 
             if ENABLE_DIGITAL_RF:
 
@@ -322,9 +329,9 @@ class ThorSimulator(gr.top_block):
 
                 os.makedirs(channel_dir, exist_ok=True)
 
-            # ------------------------------------------------
+            # ================================================
             # DIGITAL RF SINK
-            # ------------------------------------------------
+            # ================================================
 
             drf = None
 
@@ -354,9 +361,9 @@ class ThorSimulator(gr.top_block):
                     debug=True,
                 )
 
-            # ------------------------------------------------
+            # ================================================
             # ZMQ IQ STREAM
-            # ------------------------------------------------
+            # ================================================
 
             zmq_sink = zeromq.pub_sink(
 
@@ -368,9 +375,9 @@ class ThorSimulator(gr.top_block):
                 hwm=10,
             )
 
-            # ------------------------------------------------
+            # ================================================
             # CONNECTIONS
-            # ------------------------------------------------
+            # ================================================
 
             if ENABLE_DIGITAL_RF:
                 self.connect(src, drf)
@@ -378,9 +385,9 @@ class ThorSimulator(gr.top_block):
             if ENABLE_ZMQ:
                 self.connect(src, zmq_sink)
 
-            # ------------------------------------------------
+            # ================================================
             # SAVE REFERENCES
-            # ------------------------------------------------
+            # ================================================
 
             self.blocks.append({
                 "name": ch_name,
@@ -529,26 +536,33 @@ if __name__ == "__main__":
     # CONTROL SOCKET
     # ============================================================
 
-    CTRL_ADDR = "tcp://*:6000"
+    if ENABLE_ZMQ:
 
-    ctrl_socket = fg.context.socket(zmq.REP)
+        CTRL_ADDR = "tcp://*:6000"
 
-    ctrl_socket.bind(CTRL_ADDR)
+        ctrl_socket = fg.context.socket(zmq.REP)
 
-    print(f"\n[CTRL] Waiting RX READY on {CTRL_ADDR} ...")
+        ctrl_socket.bind(CTRL_ADDR)
 
-    msg = ctrl_socket.recv()
+        print(f"\n[CTRL] Waiting RX READY on {CTRL_ADDR} ...")
 
-    print(f"[CTRL] RX says: {msg.decode()}")
+        msg = ctrl_socket.recv()
 
-    ctrl_socket.send(b"START")
+        print(f"[CTRL] RX says: {msg.decode()}")
 
-    # Give ZMQ time to propagate subscriptions
-    time.sleep(1)
+        ctrl_socket.send(b"START")
 
-    print("\n[CTRL] Starting synchronized flowgraph...\n")
+        time.sleep(1)
 
-    fg.start()
+        print("\n[CTRL] Starting synchronized flowgraph...\n")
+
+        fg.start()
+
+    else:
+
+        print("\n[CTRL] ZMQ disabled. Starting flowgraph immediately...\n")
+
+        fg.start()
     
 
     try:
