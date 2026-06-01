@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-DATA_DIR = "/home/david/Documents/DATA/SIN@2026-01-21T00-00-01"
+DATA_DIR = "/home/idi/Documents/DATA/SIN@2026-01-21T00-00-01"
 
 SAMPLE_RATE = 2_500_000
 
@@ -31,7 +31,7 @@ CENTER_FREQ_CH1 = 70_312_500
 
 UUID_STR = "thor-simulator"
 
-RUN_TIME_SECONDS = 60
+RUN_TIME_SECONDS = 120
 
 ENABLE_ZMQ = 1
 ENABLE_DIGITAL_RF = 0
@@ -140,7 +140,7 @@ class ThorSimulator(gr.top_block):
             # PULSED SIGNAL PARAMETERS
             # ================================================
 
-            A = 5000.0 # 5000.0
+            A = 10000.0 # 5000.0
             ipp = 400.0e-6
             dc = 12.0 # 12.0
             sr_tx = 20.0e6
@@ -175,12 +175,12 @@ class ThorSimulator(gr.top_block):
             # NOISE POWER
             # =================================================
 
-            noise_power = 0.0
+            #noise_power = 3.0
 
             # =================================================
             # COMPLEX GAUSSIAN NOISE
             # =================================================
-
+            '''
             noise = (
                 np.random.randn(len(full_chirp))
                 +
@@ -188,18 +188,40 @@ class ThorSimulator(gr.top_block):
             )
 
             noise = noise.astype(np.complex64)
+            '''
 
             # =================================================
             # SCALE NOISE
             # =================================================
 
-            noise *= noise_power
+            #noise *= noise_power
+
+            signal_power = np.mean(np.abs(full_chirp)**2)
+
+            snr_db = 55   # prueba 30, 25, 20, 15 dB
+
+            noise_power = signal_power / (10**(snr_db/10))
+
+            noise = (
+                np.random.randn(len(full_chirp))
+                + 1j*np.random.randn(len(full_chirp))
+            ).astype(np.complex64)
+
+            noise *= np.sqrt(noise_power/2)
+
+            #full_chirp_noisy = full_chirp + noise
 
             # =================================================
             # ADD NOISE TO CHIRP
             # =================================================
 
             full_chirp_noisy = full_chirp + noise
+
+            # header = 9999 + 9999j
+            # full_chirp[0] = header
+
+            profile_len = len(full_chirp_noisy)
+            print(f"Profile length = {profile_len} samples")
 
             print("len(full_chirp) =", len(full_chirp))
 
@@ -209,20 +231,51 @@ class ThorSimulator(gr.top_block):
 
             print("peak =", peak)
 
-            plot_iq_signal( full_chirp_noisy,
-                            SAMPLE_RATE,
-                            title=ch_name
-                            )
+            #plot_iq_signal( full_chirp_noisy,
+            #                SAMPLE_RATE,
+            #                title=ch_name
+            #                )
+
+
+            # =================================================
+            # GENERATE MANY PROFILES WITH RANDOM DELAY
+            # =================================================
+
+            N_PROFILES = 1000
+
+            profiles = []
+
+            for _ in range(N_PROFILES):
+
+                shift = np.random.randint(0, 2+1)   # 0 a 20 bins
+
+                profile = np.zeros_like(full_chirp_noisy)
+
+                if shift > 0:
+                    profile[shift:] = full_chirp_noisy[:-shift]
+                else:
+                    profile[:] = full_chirp_noisy
+
+                profiles.append(profile)
+
+            tx_data = np.concatenate(profiles)
 
             # ================================================
             # GNU RADIO VECTOR SOURCE
             # ================================================
 
             src = blocks.vector_source_c(
-                full_chirp_noisy.tolist(),
+                tx_data.tolist(),
+                #full_chirp_noisy.tolist(),
                 # full_chirp.tolist(),
                 repeat=True
             )
+            
+            stream_to_vector = blocks.stream_to_vector(
+                gr.sizeof_gr_complex,
+                profile_len
+            )
+            
 
             # ================================================
             # METADATA
@@ -368,7 +421,7 @@ class ThorSimulator(gr.top_block):
             zmq_sink = zeromq.pub_sink(
 
                 itemsize=gr.sizeof_gr_complex,
-                vlen=1,
+                vlen=profile_len,
                 address=f"tcp://*:{cfg['iq_port']}",
                 timeout=100,
                 pass_tags=False,
@@ -383,7 +436,9 @@ class ThorSimulator(gr.top_block):
                 self.connect(src, drf)
 
             if ENABLE_ZMQ:
-                self.connect(src, zmq_sink)
+                #self.connect(src, zmq_sink)
+                self.connect(src, stream_to_vector)
+                self.connect(stream_to_vector, zmq_sink)
 
             # ================================================
             # SAVE REFERENCES
