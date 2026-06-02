@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ============================================================
 
-DATA_DIR = "/home/idi/Documents/DATA/SIN@2026-01-21T00-00-01"
+DATA_DIR = "/home/david/Documents/DATA/SIN@2026-01-21T00-00-01"
 
 SAMPLE_RATE = 2_500_000
 
@@ -31,7 +31,7 @@ CENTER_FREQ_CH1 = 70_312_500
 
 UUID_STR = "thor-simulator"
 
-RUN_TIME_SECONDS = 120
+RUN_TIME_SECONDS = 30
 
 ENABLE_ZMQ = 1
 ENABLE_DIGITAL_RF = 0
@@ -100,7 +100,7 @@ class ThorSimulator(gr.top_block):
                     payload
                 ])
 
-                print(f"[META] Sent {block['name']}")
+                print(f"[META] Sent {block['name']} metadata")
 
             time.sleep(1)
 
@@ -170,7 +170,6 @@ class ThorSimulator(gr.top_block):
                                             mode_f = mode_f_, 
                                             phi = phi_)
 
-            
             # =================================================
             # NOISE POWER
             # =================================================
@@ -180,6 +179,7 @@ class ThorSimulator(gr.top_block):
             # =================================================
             # COMPLEX GAUSSIAN NOISE
             # =================================================
+            
             '''
             noise = (
                 np.random.randn(len(full_chirp))
@@ -221,21 +221,11 @@ class ThorSimulator(gr.top_block):
             # full_chirp[0] = header
 
             profile_len = len(full_chirp_noisy)
-            print(f"Profile length = {profile_len} samples")
-
-            print("len(full_chirp) =", len(full_chirp))
-
-            pulse = np.abs(full_chirp)
-
-            peak = np.argmax(pulse)
-
-            print("peak =", peak)
 
             #plot_iq_signal( full_chirp_noisy,
             #                SAMPLE_RATE,
             #                title=ch_name
             #                )
-
 
             # =================================================
             # GENERATE MANY PROFILES WITH RANDOM DELAY
@@ -368,7 +358,7 @@ class ThorSimulator(gr.top_block):
                 }
             }
 
-            # -================================================
+            # ================================================
             # CHANNEL DIRECTORY
             # ================================================
 
@@ -456,7 +446,7 @@ class ThorSimulator(gr.top_block):
         # WAIT FOR SUBSCRIBERS
         # ====================================================
 
-        print("\n[ZMQ] Waiting subscribers...")
+        print("[ZMQ] Waiting subscribers...")
 
         time.sleep(2)
 
@@ -464,7 +454,7 @@ class ThorSimulator(gr.top_block):
         # START METADATA THREAD
         # ====================================================
 
-        print("\n[ZMQ] Starting metadata publisher thread...")
+        print("[ZMQ] Starting metadata publisher thread...")
 
         self.meta_thread = threading.Thread(
             target=self.metadata_loop,
@@ -474,9 +464,9 @@ class ThorSimulator(gr.top_block):
         self.meta_thread.start()
 
 
-        # ============================================================
+        # ====================================================
         # MAIN
-        # ============================================================
+        # ====================================================
 
 def plot_iq_signal(iq_data, sample_rate, title="IQ Signal"):
 
@@ -558,26 +548,22 @@ if __name__ == "__main__":
 
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    fg = ThorSimulator()
-
     print("\n====================================")
     print("THOR MULTICHANNEL SIMULATOR")
     print("====================================")
 
-    print(f"Sample Rate : {SAMPLE_RATE}")
-
-    print(f"Global Start Time : {GLOBAL_START_TIME}")
-
+    print(f"Sample Rate         : {SAMPLE_RATE}")
+    print(f"Global Start Time   : {GLOBAL_START_TIME}")
     print(f"Global Start Sample : {GLOBAL_START_SAMPLE}")
 
-    print("\nChannels:")
+    print("Channels:")
 
     for ch_name, cfg in CHANNELS.items():
 
-        print(f"\n{ch_name}")
-        print(f"  Tone       : {cfg['tone']}")
-        print(f"  CenterFreq : {cfg['center_freq']}")
-        print(f"  IQ ZMQ     : tcp://localhost:{cfg['iq_port']}")
+        print(f"{ch_name}")
+        print(f"Tone       : {cfg['tone']}")
+        print(f"CenterFreq : {cfg['center_freq']}")
+        print(f"IQ ZMQ     : tcp://localhost:{cfg['iq_port']}")
     
     '''
     print("\nMetadata ZMQ : tcp://localhost:5556")
@@ -585,11 +571,12 @@ if __name__ == "__main__":
 
     fg.start()
     '''
-
     
-    # ============================================================
+    fg = ThorSimulator()
+
+    # ====================================================
     # CONTROL SOCKET
-    # ============================================================
+    # ====================================================
 
     if ENABLE_ZMQ:
 
@@ -599,7 +586,7 @@ if __name__ == "__main__":
 
         ctrl_socket.bind(CTRL_ADDR)
 
-        print(f"\n[CTRL] Waiting RX READY on {CTRL_ADDR} ...")
+        print(f"[CTRL] Waiting RX READY on {CTRL_ADDR} ...")
 
         msg = ctrl_socket.recv()
 
